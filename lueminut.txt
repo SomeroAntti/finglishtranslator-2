@@ -1,0 +1,10 @@
+To run simply open a shell and type:
+python train.py
+
+Add/change parameters by adding --[parameter name] [value] after python train.py for ex.
+python train.py --csv transcript.csv --epochs 10 --output-dir ./wav2vec2-manual
+
+Fill in the --resume-from argument for ex.  
+python train.py --csv transcript.csv --epochs 10 --output-dir ./wav2vec2-manual --checkpoint-path ./wav2vec2-manual/checkpoint_epoch_3.pth
+
+Leave blank to start a new model.

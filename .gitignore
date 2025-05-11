@@ -1,0 +1,3 @@
+*.pth
+/wav2vec2-manual
+data.tar
