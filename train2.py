@@ -37,7 +37,7 @@ def compute_cer(ref: str, hyp: str) -> float:
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_path", type=str, default="",
                     help="Path to dataset folder containing transcript.csv and audio files")
-parser.add_argument("--csv", type=str, default="transcript.csv", help="CSV filename in data_path")
+parser.add_argument("--csv", type=str, default="C:\\Users\\Siidu\\Desktop\Gitit\\finglishtranslator-2\\transcript.csv", help="CSV filename in data_path")
 parser.add_argument("--output_dir", type=str, default="./wav2vec2_finetuned")
 parser.add_argument("--num_train_epochs", type=int, default=10)
 parser.add_argument("--per_device_train_batch_size", type=int, default=8)
