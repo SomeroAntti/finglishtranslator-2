@@ -63,33 +63,49 @@ def resolve_paths(df: pd.DataFrame, csv_path: Path) -> pd.DataFrame:
 
 
 def preprocess_dataset(dataset: Dataset, processor: Wav2Vec2Processor) -> Dataset:
+    """
+    Tokenizes and augments audio data, including noise, speed, volume, and SpecAugment.
+    """
     def preprocess(example):
         audio = example["path"]["array"]
         audio = torch.tensor(audio)
 
-        # Augmentation
+        # Basic augmentations
         if random.random() < 0.5:
             audio = add_noise(audio)
             audio = random_volume(audio)
             audio = change_speed(audio, orig_sr=16000, factor=random.choice([0.9, 1.1]))
 
-        # Extract features
+        # Extract raw features
         audio_inputs = processor.feature_extractor(audio, sampling_rate=16000, return_attention_mask=False)
         input_values = audio_inputs["input_values"]
         if isinstance(input_values, list) and len(input_values) == 1:
             input_values = input_values[0]
 
-        # Tokenize labels without special tokens
+        # Convert to tensor for SpecAugment
+        input_tensor = torch.tensor(input_values)
+        # Apply SpecAugment: frequency and time masking
+        if random.random() < 0.5:
+            freq_mask = T.FrequencyMasking(freq_mask_param=15)
+            time_mask = T.TimeMasking(time_mask_param=35)
+            input_tensor = freq_mask(input_tensor)
+            input_tensor = time_mask(input_tensor)
+
+        # Back to list for the dataset
+        input_values = input_tensor.tolist()
+
+        # Tokenize labels without special tokens or apostrophes
+        text = example["text"].replace("'", " ")
         with processor.as_target_processor():
-            labels = processor.tokenizer(example["text"], add_special_tokens=False).input_ids
+            labels = processor.tokenizer(text, add_special_tokens=False).input_ids
 
         return {
             "input_values": input_values,
             "labels": labels,
-            "reference_text": example["text"]
+            "reference_text": example["text"].lower()
         }
 
-    return dataset.map(preprocess, remove_columns=["path", "text"])
+    return dataset.map(preprocess, remove_columns=["path", "text"])(preprocess, remove_columns=["path", "text"])
 
 
 def save_checkpoint(model, optimizer, epoch, loss, filepath):
@@ -113,7 +129,7 @@ def load_checkpoint(model, optimizer, checkpoint_path):
     return model, optimizer, checkpoint['epoch'], checkpoint['loss']
 
 
-def train(model, processor, train_loader, eval_dataset, device, args, logger, checkpoint_path, patience=2, min_delta=0.001):
+def train(model, processor, train_loader, eval_dataset, device, args, logger, checkpoint_path, patience=3, min_delta=0.001):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     model.to(device)
@@ -305,15 +321,15 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manual fine-tuning of Wav2Vec2.")
-    parser.add_argument('--data_path', type=str, default="")
-    parser.add_argument('--csv', type=str, default="transcript.csv")
-    parser.add_argument('--model-name', type=str, default="facebook/wav2vec2-base-960h")
-    parser.add_argument('--output-dir', type=str, default="./output")
-    parser.add_argument('--batch-size', type=int, default=8)
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--learning-rate', type=float, default=1e-5)
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--checkpoint-path', type=str, default=None,
-                        help="Path to checkpoint to resume training from.")
-    args = parser.parse_args()
-    main(args)
+parser.add_argument('--data_path', type=str, default="")
+parser.add_argument('--csv', type=str, default="transcript.csv")
+parser.add_argument('--model-name', type=str, default="facebook/wav2vec2-base-960h")
+parser.add_argument('--output-dir', type=str, default="./output")
+parser.add_argument('--batch-size', type=int, default=8)
+parser.add_argument('--epochs', type=int, default=20, help="Increase epochs for better convergence")
+parser.add_argument('--learning-rate', type=float, default=5e-6, help="Lower initial LR")
+parser.add_argument('--seed', type=int, default=42)
+parser.add_argument('--checkpoint-path', type=str, default=None,
+                    help="Path to checkpoint to resume training from.")
+args = parser.parse_args()
+main(args)
