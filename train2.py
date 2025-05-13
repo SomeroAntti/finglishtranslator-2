@@ -39,7 +39,7 @@ parser.add_argument("--data_path", type=str, default="",
                     help="Path to dataset folder containing transcript.csv and audio files")
 parser.add_argument("--csv", type=str, default="transcript.csv", help="CSV filename in data_path")
 parser.add_argument("--output_dir", type=str, default="./wav2vec2_finetuned")
-parser.add_argument("--num_train_epochs", type=int, default=3)
+parser.add_argument("--num_train_epochs", type=int, default=10)
 parser.add_argument("--per_device_train_batch_size", type=int, default=8)
 parser.add_argument("--learning_rate", type=float, default=2e-5)
 args = parser.parse_args()
@@ -48,8 +48,7 @@ args = parser.parse_args()
 csv_file = os.path.join(args.data_path, args.csv)
 logger.info(f"Loading metadata from {csv_file}")
 df = pd.read_csv(csv_file, sep=";")
-# Expect columns: path,text
-# Make paths absolute
+# Expect columns: path;text
 base = args.data_path
 df["path"] = df["path"].apply(lambda p: os.path.join(base, p) if not os.path.isabs(p) else p)
 
@@ -70,10 +69,11 @@ model = Wav2Vec2ForCTC.from_pretrained(
 def preprocess_dataset(dataset: Dataset, processor: Wav2Vec2Processor) -> Dataset:
     def preprocess(example):
         audio = example["path"]["array"]
-        inputs = processor(audio, sampling_rate=16000)
+        # Use feature_extractor directly to avoid conflicting args
+        inputs = processor.feature_extractor(audio, sampling_rate=16000, return_attention_mask=False)
         text = example.get("text", "").lower().strip()
         with processor.as_target_processor():
-            labels = processor(text).input_ids
+            labels = processor.tokenizer(text).input_ids
         return {"input_values": inputs["input_values"], "labels": labels}
     return dataset.map(preprocess, remove_columns=["path", "text"])
 
@@ -106,8 +106,7 @@ def compute_metrics(pred):
         logger.info(f"   HYP: {hyp}")
     return {"wer": avg_wer, "cer": avg_cer}
 
-# ------- Training Arguments -------
-from transformers import TrainingArguments
+# ------- Training Arguments & Trainer -------
 training_args = TrainingArguments(
     output_dir=args.output_dir,
     group_by_length=True,
@@ -123,15 +122,13 @@ training_args = TrainingArguments(
     save_total_limit=2,
     push_to_hub=False,
 )
-
-# ------- Trainer Setup -------
-from transformers import Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=processed["train"],
     eval_dataset=processed["test"],
-    tokenizer=processor.feature_extractor,
+    data_collator=None,
+    tokenizer=processor,
     compute_metrics=compute_metrics,
 )
 
