@@ -7,7 +7,7 @@ optimize_model.py
 3. Baseline eval (size, latency, WER)
 4. Dynamic & Static INT8 quantization
 5. Ablation logging (ablation.csv)
-6. Export best model: ExecuTorch if available, else TorchScript
+6. Export best model: ExecuTorch if available, else TorchScript (logits-only)
 """
 
 import os
@@ -26,7 +26,7 @@ from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from jiwer import wer
 
 # === CONFIGURATION ===
-MODEL_CHECKPOINT = "C:\\Users\\Siidu\\coding\\neural\\model.pt"          # local fine-tuned checkpoint path
+MODEL_CHECKPOINT = "./model.pt"          # local fine-tuned checkpoint path
 BASE_MODEL = "facebook/wav2vec2-base-960h"
 DATA_DIR = "./data"
 CALIBRATION_SAMPLES = 200
@@ -149,15 +149,25 @@ except Exception as e:
 # Choose quantized model object (dynamic or static) for export
 quantized_model = model_dyn  # switch to model_stat if static is better
 
-# Export directly from the quantized model instance
+# Define a wrapper to only return logits (no dict output)
+class LogitsOnlyWrapper(torch.nn.Module):
+    def __init__(self, base_model):
+        super().__init__()
+        self.base = base_model
+    def forward(self, input_values):
+        # forward pass returns logits tensor directly
+        return self.base(input_values).logits
+
+# Export directly from the wrapped quantized model
+wrapped = LogitsOnlyWrapper(quantized_model).eval()
 try:
     import executorch
     print("Exporting to ExecuTorch (.et)…")
-    executorch.export(quantized_model, input_values, "model.et")
+    executorch.export(wrapped, input_values, "model.et")
     print("→ model.et created")
 except ImportError:
     print("executorch not found — exporting TorchScript")
-    traced = torch.jit.trace(quantized_model, input_values)
+    traced = torch.jit.trace(wrapped, input_values)
     traced.save("model_ts.pt")
     print("→ model_ts.pt created")
 
