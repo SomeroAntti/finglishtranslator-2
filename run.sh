@@ -13,6 +13,6 @@ module load pytorch
 
 set -x
 
-tar xf /scratch/project_2014146/janne-kauppila/data.tar -C $LOCAL_SCRATCH
+tar xf /scratch/project_2014146/antti-somero/data.tar -C $LOCAL_SCRATCH
 
-srun python3 train2.py --data_path=$LOCAL_SCRATCH/project_2014146/janne-kauppila/data/train --output_dir=$LOCAL_SCRATCH/project_2014146/janne-kauppila/output
+srun python3 train2.py
