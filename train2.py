@@ -186,8 +186,12 @@ def evaluate(model, processor, dataset, device, logger, num_samples=None):
 
             logits = model(input_values, attention_mask=attention_mask).logits
             pred_ids = torch.argmax(logits, dim=-1)
-            transcription = processor.batch_decode(pred_ids)[0].lower()
-            reference = sample["reference_text"].lower()
+            # Decode without special tokens and filter unknowns
+            raw_preds = processor.batch_decode(pred_ids, skip_special_tokens=True)
+            transcription = raw_preds[0].lower().strip()
+            # Remove any <unk> placeholders and extra spaces
+            transcription = transcription.replace("<unk>", "").replace("  ", " ").strip()
+            reference = sample["reference_text"].lower().strip()
 
             wer = compute_wer(reference, transcription)
             cer = compute_cer(reference, transcription)
@@ -196,7 +200,7 @@ def evaluate(model, processor, dataset, device, logger, num_samples=None):
             logger.info(f"Ref:  {reference}")
             logger.info(f"Pred: {transcription}")
             logger.info(f"WER:  {wer:.2f}")
-            logger.info(f"CER:  {cer:.2f}\n")
+            logger.info(f"CER:  {cer:.2f}")
 
     avg_wer = np.mean(wer_scores)
     avg_cer = np.mean(cer_scores)
