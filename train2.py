@@ -69,7 +69,6 @@ model = Wav2Vec2ForCTC.from_pretrained(
 def preprocess_dataset(dataset: Dataset, processor: Wav2Vec2Processor) -> Dataset:
     def preprocess(example):
         audio = example["path"]["array"]
-        # Use feature_extractor directly to avoid conflicting args
         inputs = processor.feature_extractor(audio, sampling_rate=16000, return_attention_mask=False)
         text = example.get("text", "").lower().strip()
         with processor.as_target_processor():
@@ -107,27 +106,18 @@ def compute_metrics(pred):
     return {"wer": avg_wer, "cer": avg_cer}
 
 # ------- Training Arguments & Trainer -------
+from transformers import TrainingArguments, Trainer
 training_args = TrainingArguments(
     output_dir=args.output_dir,
-    group_by_length=True,
-    per_device_train_batch_size=args.per_device_train_batch_size,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
-    logging_dir=f"{args.output_dir}/logs",
-    learning_rate=args.learning_rate,
     num_train_epochs=args.num_train_epochs,
-    weight_decay=0.005,
-    warmup_steps=500,
-    logging_steps=10,
-    save_total_limit=2,
-    push_to_hub=False,
+    per_device_train_batch_size=args.per_device_train_batch_size,
+    learning_rate=args.learning_rate,
 )
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=processed["train"],
     eval_dataset=processed["test"],
-    data_collator=None,
     tokenizer=processor,
     compute_metrics=compute_metrics,
 )
