@@ -29,6 +29,33 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, set_seed
 
 import torchaudio
 
+import torchaudio.transforms as T
+
+# at top of train2.py:
+mel_spec = T.MelSpectrogram(
+    sample_rate=16000,
+    n_fft=400,
+    hop_length=160,
+    n_mels=80
+)
+freq_mask = T.FrequencyMasking(freq_mask_param=15)
+time_mask = T.TimeMasking(time_mask_param=35)
+
+def preprocess(example, processor):
+    # 1. Load 1D waveform from the dataset example
+    waveform = example["audio"]["array"]       # or however you access it
+    # 2. Convert to 2D spectrogram
+    spec = mel_spec(waveform)                  # shape: [n_mels, time_steps]
+    # 3. Apply Frequency & Time masking on the spectrogram
+    spec = freq_mask(spec)
+    spec = time_mask(spec)
+    # 4. (If your model expects raw audio, invert back. 
+    #    Otherwise, feed `spec` directly into a spectrogram-based model.)
+    example["input_values"] = spec
+    example["labels"] = processor.tokenizer(example["text"], return_tensors="pt").input_ids.squeeze(0).tolist()
+    return example
+
+
 # Data augmentation
 
 def add_noise(audio, noise_level=0.005):
@@ -286,6 +313,7 @@ def main(args):
     original_dataset = Dataset.from_pandas(df)
     original_dataset = original_dataset.cast_column("path", Audio(sampling_rate=16000))
     processed_dataset = preprocess_dataset(original_dataset, processor)
+    processed_dataset = processed_dataset.map(lambda example: preprocess(example, processor), remove_columns=["path", "text"])
 
     logger.info("Splitting dataset...")
     val_size = int(0.2 * len(processed_dataset))
