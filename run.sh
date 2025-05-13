@@ -13,6 +13,6 @@ module load pytorch
 
 set -x
 
-tar xf /scratch/project_2014146/antti-somero/data.tar -C $LOCAL_SCRATCH
+tar xf /scratch/project_2014146/antti-somero/data.tar.gz -C $LOCAL_SCRATCH
 
-srun python3 train2.py.gz
+srun python3 train2.py
