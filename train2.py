@@ -343,7 +343,7 @@ if __name__ == "__main__":
     parser.add_argument("--csv", type=str, default="transcript.csv")
     parser.add_argument("--model-name", type=str, default="facebook/wav2vec2-base-960h")
     #parser.add_argument("--model-name", type=str, default="facebook/wav2vec2-large-960h-lv60-self")
-    parser.add_argument("--output-dir", type=str, default="C:\\Users\\Siidu\\Desktop\\finglishtranslator-main\\wav2vec2-manual")
+    parser.add_argument("--output-dir", type=str, default="./checkpoints")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--learning-rate", type=float, default=1e-8)
